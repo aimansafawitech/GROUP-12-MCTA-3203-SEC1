@@ -1,0 +1,27 @@
+ import serial
+ import time
+
+ ser = serial.Serial('COM5', 9600, timeout=1)
+ time.sleep(2)
+ print("Connected to Arduino.\n")
+ print("Commands:")
+ print("  manual  → manually input the angle, RANGE (0 TO 180 ONLY)")
+ print("  pot     → use potentiometer ")
+ print("  q       → exit\n")
+
+ try:
+     while True:
+         cmd = input("Enter command or angle: ")
+         if cmd.lower() == 'q':
+             break
+         ser.write((cmd + '\n').encode())  # send with newline
+         time.sleep(0.1)
+
+         if ser.in_waiting > 0:
+             print("Arduino:", ser.readline().decode().strip())
+
+ except KeyboardInterrupt:
+     pass
+ finally:
+     ser.close()
+     print("Serial connection closed.")
