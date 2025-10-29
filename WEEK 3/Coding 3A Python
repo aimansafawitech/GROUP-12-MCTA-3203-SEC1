@@ -1,0 +1,25 @@
+import serial
+import time
+ser = serial.Serial('COM5', 9600, timeout=0.1)
+time.sleep(2)
+
+try:
+     while True:
+         line = ser.readline().decode().strip()
+         if line.isdigit():
+             pot_value = int(line)
+             print("Potentiometer Value:", pot_value)
+
+             # Immediately send LED command
+             if pot_value > 512:
+                 ser.write(b"ON\n")
+             else:
+                 ser.write(b"OFF\n")
+
+ except KeyboardInterrupt:
+     print("\nProgram interrupted by user.")
+
+ finally:
+     ser.close()
+     print("Serial connection closed.")
+
