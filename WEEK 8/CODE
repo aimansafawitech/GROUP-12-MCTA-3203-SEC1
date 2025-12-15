@@ -1,0 +1,66 @@
+#include "DHT.h"
+#include "BluetoothSerial.h"
+
+#define DHTPIN 4        // Data pin connected to DHT11
+#define DHTTYPE DHT11   // Change to DHT11
+
+BluetoothSerial SerialBT;   // ESP32 built-in Bluetooth
+DHT dht(DHTPIN, DHTTYPE);
+
+const int LEDPIN = 2;  // ESP32 onboard LED (GPIO 2)
+
+void setup() {
+  Serial.begin(115200);       // USB Serial for debugging
+  SerialBT.begin("ESP32_BT"); // Bluetooth device name
+  dht.begin();
+
+  pinMode(LEDPIN, OUTPUT);
+  digitalWrite(LEDPIN, LOW);
+
+  Serial.println("ESP32 + DHT11 Bluetooth Monitoring Ready");
+}
+
+void loop() {
+  float temp = dht.readTemperature(); // Celsius
+  float hum  = dht.readHumidity();
+
+  if (!isnan(temp) && !isnan(hum)) {
+    // Send temperature (or send both if you prefer)
+    SerialBT.print("TEMP:");
+    SerialBT.print(temp);
+    SerialBT.print("C  HUM:");
+    SerialBT.print(hum);
+    SerialBT.println("%");
+
+    // Debug to USB
+    Serial.print("Temp: ");
+    Serial.print(temp);
+    Serial.print(" °C | Humidity: ");
+    Serial.print(hum);
+    Serial.println(" %");
+  }
+  else {
+    Serial.println("Failed to read from DHT11 sensor!");
+    SerialBT.println("ERROR");
+  }
+
+  // Receive commands from Bluetooth
+  if (SerialBT.available()) {
+    String cmd = SerialBT.readStringUntil('\n');
+    cmd.trim();
+
+    if (cmd == "FAN ON") {
+      digitalWrite(LEDPIN, HIGH);
+      SerialBT.println("ACK: FAN ON");
+    }
+    else if (cmd == "FAN OFF") {
+      digitalWrite(LEDPIN, LOW);
+      SerialBT.println("ACK: FAN OFF");
+    }
+    else {
+      SerialBT.println("UNKNOWN COMMAND");
+    }
+  }
+
+  delay(2000);  // DHT11 requires 1–2 seconds delay
+}
