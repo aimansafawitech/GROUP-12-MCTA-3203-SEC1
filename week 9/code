@@ -1,0 +1,76 @@
+#include <SoftwareSerial.h>
+#include "HUSKYLENS.h"
+
+#define RED_LED   11
+#define GREEN_LED 10
+#define BLUE_LED  9
+
+HUSKYLENS huskylens;
+SoftwareSerial huskySerial(4, 5); // RX, TX
+
+void setup() {
+  Serial.begin(9600);
+  huskySerial.begin(9600);
+  pinMode(RED_LED, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(BLUE_LED, OUTPUT);
+
+  // Turn off RGB LED
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(BLUE_LED, LOW);
+
+
+  while (!huskylens.begin(huskySerial)) {
+    Serial.println("HuskyLens not connected!");
+    delay(1000);
+  }
+
+  Serial.println("HuskyLens Ready");
+}
+
+void loop() {
+  if (!huskylens.request()) {
+    Serial.println("Request failed");
+    return;
+  }
+
+  if (huskylens.available()) {
+    HUSKYLENSResult result = huskylens.read();
+
+    Serial.print("Detected Color ID: ");
+    Serial.println(result.ID);
+
+    if (result.ID == 1) {
+      Serial.println("Color: RED");
+        digitalWrite(RED_LED, HIGH);
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(BLUE_LED, LOW);
+
+
+    }
+    else if (result.ID == 2) {
+      Serial.println("Color: GREEN");
+        digitalWrite(RED_LED, LOW);
+  digitalWrite(GREEN_LED, HIGH);
+  digitalWrite(BLUE_LED, LOW);
+
+    }
+    else if (result.ID == 3) {
+      Serial.println("Color: BLUE");
+        digitalWrite(RED_LED, LOW);
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(BLUE_LED, HIGH);
+
+    }
+   
+
+    else {
+      Serial.println("Unknown Color");
+    }
+
+    Serial.println("----------------");
+  }
+
+  delay(200);
+}
