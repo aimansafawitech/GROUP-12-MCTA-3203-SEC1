@@ -1,0 +1,85 @@
+#include <Wire.h>
+#include <Adafruit_MLX90614.h>
+#include "BluetoothSerial.h"
+#include <HUSKYLENS.h>  // Make sure the HuskyLens library is installed
+
+// 1. MAC Address - Double check these numbers match your AT+ADDR? result
+uint8_t address[6] = {0x98, 0xD3, 0x21, 0xF8, 0x66, 0x22};
+
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+BluetoothSerial SerialBT;
+HUSKYLENS huskylens;
+
+const int potPin = 34;
+const int buzzerPin = 25;
+float thresholds[] = {30.0, 35.0, 40.0};
+
+// HuskyLens custom I2C pins
+#define HUSKY_SDA 19
+#define HUSKY_SCL 18
+
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(buzzerPin, OUTPUT);
+  digitalWrite(buzzerPin, LOW);  // ensure buzzer is off
+
+  delay(2000);
+  Serial.println("\n--- SYSTEM STARTING ---");
+
+  // MLX90614
+  if (!mlx.begin()) {
+    Serial.println("SENSOR ERROR: Check SDA(21) and SCL(22)");
+    while (1); 
+  }
+
+  // HuskyLens on custom I2C pins
+  Wire.begin(HUSKY_SDA, HUSKY_SCL);
+  while (!huskylens.begin(Wire)) {
+    Serial.println("HuskyLens init failed! Retrying...");
+    delay(500);
+  }
+  Serial.println("HuskyLens ready!");
+
+  // Initialize Bluetooth as Master
+  SerialBT.begin("ESP32_Master", true); 
+  SerialBT.setPin("1234", 4); 
+  Serial.println("Searching for HC-05...");
+
+  if (SerialBT.connect(address)) {
+    Serial.println("SUCCESS: Connected to HC-05!");
+  } else {
+    Serial.println("FAILED: Connection timed out.");
+  }
+}
+
+void loop() {
+  // Retry Bluetooth if disconnected
+  if (!SerialBT.connected()) {
+    Serial.println("Connection lost. Retrying...");
+    SerialBT.connect(address);
+    delay(5000);
+    return;
+  }
+
+  int potValue = analogRead(potPin);
+  float limit = (potValue < 1365) ? thresholds[0] : (potValue < 2730) ? thresholds[1] : thresholds[2];
+  float objTemp = mlx.readObjectTempC();
+
+  Serial.print("Temp: "); Serial.print(objTemp);
+  Serial.print("C | Limit: "); Serial.println(limit);
+
+  // Fire detection
+  if (objTemp > limit) {
+    Serial.println("!!! FIRE !!!");
+    SerialBT.print('H'); 
+    digitalWrite(buzzerPin, HIGH); // Turn on buzzer
+    delay(2500);
+    digitalWrite(buzzerPin, LOW);  // Turn off buzzer
+  }
+
+  // HuskyLens can read here if needed
+  // huskylens.request(); // Uncomment and add logic if needed
+
+  delay(500);
+}
