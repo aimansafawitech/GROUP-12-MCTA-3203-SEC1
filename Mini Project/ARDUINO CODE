@@ -1,0 +1,83 @@
+#include <SoftwareSerial.h>
+#include <Servo.h>
+
+// LiDAR stays on SoftwareSerial
+SoftwareSerial LidarSerial(2, 8); // TX->2, RX->8
+Servo sweepServo;
+
+const int M1_PWM = 5;  const int M1_DIR = 4;
+const int M2_PWM = 6;  const int M2_DIR = 7;
+
+int pos = 0;
+int step = 3; 
+bool movingUp = true;
+
+void setup() {
+  // Bluetooth is now on Hardware Serial (Pins 0 & 1)
+  Serial.begin(9600); 
+  
+  // LiDAR is on Software Serial
+  LidarSerial.begin(115200); 
+  
+  sweepServo.attach(3);
+  
+  pinMode(M1_PWM, OUTPUT); pinMode(M1_DIR, OUTPUT);
+  pinMode(M2_PWM, OUTPUT); pinMode(M2_DIR, OUTPUT);
+  digitalWrite(M1_DIR, HIGH); digitalWrite(M2_DIR, HIGH);
+
+  // Blink LED 13 to show it started
+  pinMode(13, OUTPUT);
+  digitalWrite(13, HIGH); delay(500); digitalWrite(13, LOW);
+}
+
+void loop() {
+  // --- 1. BLUETOOTH (Always Listening on Pins 0/1) ---
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    if (command == 'H') {
+      vibrateAlarm();
+    }
+  }
+
+  // --- 2. LIDAR (Reading from Pins 2/8) ---
+  int dist = getUARTDistance();
+  if (dist > 0 && dist < 120) {
+    if (pos < 85) { analogWrite(M1_PWM, 220); analogWrite(M2_PWM, 0); }
+    else if (pos > 95) { analogWrite(M2_PWM, 220); analogWrite(M1_PWM, 0); }
+  } else {
+    analogWrite(M1_PWM, 0); analogWrite(M2_PWM, 0);
+  }
+
+  // --- 3. SERVO SWEEP ---
+  sweepServo.write(pos);
+  if (movingUp) { pos += step; if (pos >= 180) movingUp = false; }
+  else { pos -= step; if (pos <= 0) movingUp = true; }
+
+  delay(20); 
+}
+
+int getUARTDistance() {
+  // We check for data without "blocking" the code
+  while (LidarSerial.available() >= 9) {
+    if (LidarSerial.read() == 0x59) {
+      if (LidarSerial.read() == 0x59) {
+        uint8_t low = LidarSerial.read();
+        uint8_t high = LidarSerial.read();
+        for(int i=0; i<5; i++) LidarSerial.read(); 
+        return low + (high << 8);
+      }
+    }
+  }
+  return -1;
+}
+
+void vibrateAlarm() {
+  sweepServo.detach(); 
+  for(int i=0; i<3; i++) {
+    analogWrite(M1_PWM, 255); analogWrite(M2_PWM, 255);
+    delay(200);
+    analogWrite(M1_PWM, 0); analogWrite(M2_PWM, 0);
+    delay(100);
+  }
+  sweepServo.attach(3);
+}
